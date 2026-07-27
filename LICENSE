@@ -1,0 +1,24 @@
+BATHRON Explorer — license summary
+==================================
+
+1. Explorer code (public/index.php, tracker/finality_tracker.php,
+   src/config.php and the page assets):
+
+   Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International
+   (CC BY-NC-SA 4.0)
+
+   This code is a derivative of "RPC Ace" by Robin Leffmann, which is
+   licensed CC BY-NC-SA 4.0; the ShareAlike condition therefore applies to
+   this derivative as a whole.
+
+   Full legal text: https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode
+   Human-readable summary: https://creativecommons.org/licenses/by-nc-sa/4.0/
+
+   You are free to share and adapt this code for NON-commercial purposes,
+   provided you give appropriate credit and distribute your contributions
+   under the same license.
+
+2. src/easybitcoin.php:
+
+   MIT License — copyright its original author; the full notice is preserved
+   at the top of the file and in licenses/easybitcoin-MIT.txt.

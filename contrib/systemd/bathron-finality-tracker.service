@@ -1,0 +1,15 @@
+# Example unit — adjust paths to your install location.
+[Unit]
+Description=BATHRON Explorer finality tracker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=www-data
+EnvironmentFile=/etc/bathron/explorer-rpc.env
+ExecStart=/usr/bin/php /opt/bathron-explorer/tracker/finality_tracker.php
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
