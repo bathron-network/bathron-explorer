@@ -3304,6 +3304,8 @@ try {
 
             <!-- Note about operator-centric model -->
             <div class="card" style="margin-top: 20px;">
+                <div class="card-header">Operator endpoints</div>
+                <p style="color: var(--text-secondary); font-size: 13px;">Consensus operator endpoints are public on-chain metadata. They are not RPC endpoints and are not required to join; users bootstrap through the public Seed documented by <a href="https://github.com/bathron-network/bathron-core" target="_blank" style="color: var(--accent);">bathron-core</a>.</p>
                 <div class="card-header">About Operator-Centric Model</div>
                 <div style="padding: 20px; color: var(--text-secondary); font-size: 14px; line-height: 1.8;">
                     <p><strong>Identity = Operator Public Key</strong></p>
@@ -3912,7 +3914,7 @@ bitcoin-cli -signet sendrawtransaction "SIGNED_TX"</pre>
                         <pre style="background: #0d1117; color: #c9d1d9; padding: 16px; border-radius: 6px; overflow-x: auto; font-size: 13px; line-height: 1.6; margin: 0;"># One command — handles everything automatically
 ./burn_signet.sh <?= htmlspecialchars($joinAddr) ?> 10000</pre>
                         <p style="color: var(--text-secondary); font-size: 13px; margin-top: 10px;">
-                            Get it: <a href="https://github.com/AdonisPhusis/bathron-node-tools" target="_blank" style="color: var(--accent);">github.com/AdonisPhusis/bathron-node-tools</a>
+                            Get it: <a href="https://github.com/bathron-network/bathron-core/tree/main/contrib/node-tools" target="_blank" style="color: var(--accent);">bathron-core/contrib/node-tools</a>
                         </p>
                     </div>
                     <?php endif; ?>
