@@ -74,6 +74,14 @@ Checks: PHP lint, fail-closed behavior without credentials, config parsing,
 and the anti-secret / anti-server-path guards (no credentials, no `/home/...`
 paths, no operator IPs, no generated data tracked by git).
 
+## Transport note
+
+The reference public instance is currently served over **plain HTTP** (an
+experimental testnet demonstrator — it displays public chain data and holds
+no secrets). Do not treat it as a trusted endpoint. An HTTPS migration
+(reverse proxy + certificate) is planned as a separate operational change;
+self-hosters are encouraged to front `public/` with TLS from day one.
+
 ## Security
 
 Please report vulnerabilities to **security@bathron.org** — see
