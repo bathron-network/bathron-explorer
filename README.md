@@ -79,13 +79,19 @@ paths, no operator IPs, no generated data tracked by git).
 Please report vulnerabilities to **security@bathron.org** — see
 [SECURITY.md](SECURITY.md). Do not open public issues for security reports.
 
-## License
+## License — source-available (CC BY-NC-SA 4.0)
 
-- Explorer (`public/index.php`, `tracker/`, `src/config.php`):
-  **CC BY-NC-SA 4.0** — derived from
-  RPC Ace by Robin Leffmann
-  (CC BY-NC-SA 4.0; the ShareAlike terms carry over to this derivative).
+This explorer derives from [RPC Ace](https://github.com/stolendata/rpc-ace/)
+v0.8.0 by Robin Leffmann, licensed **CC BY-NC-SA 4.0**; the ShareAlike terms
+carry over, so this repository is published under the same license. That makes
+it **source-available, not open source** in the OSI sense (the NonCommercial
+clause restricts commercial use), and the license is inherited rather than
+chosen — Creative Commons itself advises against CC licenses for software.
+
+- Explorer (`public/index.php`, `tracker/`, `src/config.php`): CC BY-NC-SA 4.0
 - `src/easybitcoin.php`: **MIT** (third-party, notice preserved in the file
-  and in [licenses/](licenses/)).
+  and in [licenses/](licenses/))
 
+Full upstream pin (exact commit, verifiable archive SHA-256, per-file
+derivation map): **[PROVENANCE-UPSTREAM.md](PROVENANCE-UPSTREAM.md)**.
 See [LICENSE](LICENSE).

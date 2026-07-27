@@ -7,9 +7,12 @@ BATHRON Explorer — license summary
    Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International
    (CC BY-NC-SA 4.0)
 
-   This code is a derivative of "RPC Ace" by Robin Leffmann, which is
-   licensed CC BY-NC-SA 4.0; the ShareAlike condition therefore applies to
-   this derivative as a whole.
+   This code is a derivative of "RPC Ace" v0.8.0 by Robin Leffmann
+   (https://github.com/stolendata/rpc-ace/, pinned commit
+   183cbb957784260410059b9b53247b9f23ad8bdf — see PROVENANCE-UPSTREAM.md
+   for the verifiable archive hash and the per-file derivation map), which
+   is licensed CC BY-NC-SA 4.0; the ShareAlike condition therefore applies
+   to this derivative as a whole.
 
    Full legal text: https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode
    Human-readable summary: https://creativecommons.org/licenses/by-nc-sa/4.0/
