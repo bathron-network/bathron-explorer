@@ -2216,7 +2216,7 @@ try {
         /* Quick Stats Row */
         .bp30-quick-stats {
             display: grid;
-            grid-template-columns: repeat(5, 1fr);
+            grid-template-columns: repeat(4, 1fr);
             gap: 12px;
             margin-bottom: 25px;
         }
@@ -2246,6 +2246,12 @@ try {
             color: var(--accent-light);
         }
 
+        .bp30-quick-stat .sub {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             header .container {
@@ -2258,6 +2264,10 @@ try {
             }
 
             .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .bp30-quick-stats {
                 grid-template-columns: repeat(2, 1fr);
             }
 
@@ -2364,33 +2374,27 @@ try {
                     <div class="label">Block</div>
                     <div class="value accent"><?= number_format($data['network']['blocks']) ?></div>
                 </div>
+                <?php $dashFinPart = BATHRONExplorer::getFinalityParticipation(32); ?>
                 <div class="bp30-quick-stat">
-                    <div class="label">Finality</div>
+                    <div class="label" title="Opérateurs ayant signé la finalité dans les 32 derniers blocs finalisés — la mesure de VIVACITÉ réelle (source : store de finalité consensus)">Finality</div>
                     <div class="value" style="color: <?= $data['network']['finality_status'] === 'healthy' ? 'var(--success)' : 'var(--warning)' ?>;">
                         <?= strtoupper($data['network']['finality_status']) ?>
                     </div>
-                </div>
-                <div class="bp30-quick-stat">
-                    <div class="label" title="MNs valides / enregistrées dans la liste déterministe (état consensus — PAS une mesure de vivacité : une MN silencieuse reste 'valide' tant qu'elle n'est pas PoSe-ban)">MNs (reg.)</div>
-                    <div class="value"><?= $data['network']['masternodes_active'] ?>/<?= $data['network']['masternodes_total'] ?></div>
-                </div>
-                <div class="bp30-quick-stat">
-                    <div class="label">Operators</div>
-                    <div class="value"><?= $data['network']['operators_count'] ?></div>
-                </div>
-                <?php $dashFinPart = BATHRONExplorer::getFinalityParticipation(32); ?>
-                <div class="bp30-quick-stat">
-                    <div class="label" title="Opérateurs ayant signé la finalité dans les 32 derniers blocs finalisés — la mesure de VIVACITÉ réelle (source : store de finalité consensus)">Signers (32 blk)</div>
-                    <div class="value">
+                    <div class="sub">
                         <?php if (($dashFinPart['blocks_with_finality'] ?? 0) > 0):
                             $liveSigners = 0;
                             foreach ($dashFinPart['operators'] as $opk => $st) { if ($st['signed'] > 0) $liveSigners++; }
                         ?>
-                            <?= $liveSigners ?>/<?= count($dashFinPart['operators']) ?>
+                            <?= $liveSigners ?>/<?= count($dashFinPart['operators']) ?> signers · last 32 blocks
                         <?php else: ?>
-                            <span style="color: var(--text-secondary);">n/a</span>
+                            signers n/a
                         <?php endif; ?>
                     </div>
+                </div>
+                <div class="bp30-quick-stat">
+                    <div class="label" title="Opérateurs de consensus (1 opérateur = 1 voix de finalité) ; MNs = entrées enregistrées dans la liste déterministe (état consensus, pas vivacité)">Operators</div>
+                    <div class="value"><?= $data['network']['operators_count'] ?></div>
+                    <div class="sub"><?= $data['network']['masternodes_active'] ?>/<?= $data['network']['masternodes_total'] ?> MNs registered</div>
                 </div>
                 <div class="bp30-quick-stat">
                     <div class="label">Mempool</div>
