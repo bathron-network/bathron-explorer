@@ -364,7 +364,7 @@ class BATHRONExplorer
         $result = [
             'total_burns' => 0,
             'total_pending' => 0,
-            'btc_transferred' => 0,
+            'btc_destroyed' => 0,
             'btc_pending' => 0,
         ];
 
@@ -377,7 +377,7 @@ class BATHRONExplorer
                 // burn_count from burnclaimdb is 0 for genesis burns - we'll fix below
                 $result['total_burns'] = $burns['burn_count'] ?? 0;
                 $result['total_pending'] = $burns['pending_count'] ?? 0;
-                $result['btc_transferred'] = intval($burns['btc_burned_sats'] ?? 0);
+                $result['btc_destroyed'] = intval($burns['btc_burned_sats'] ?? 0);
                 $result['btc_pending'] = intval($burns['btc_pending_sats'] ?? 0);
             }
         } catch (Exception $e) {
@@ -1158,13 +1158,24 @@ try {
             $data['error'] = 'Invalid address: ' . htmlspecialchars($query);
         }
     } elseif (is_numeric($query) && $query > 0) {
-        // Block height query - show block list from that height
-        $page = 'blocks';
-        $data = BATHRONExplorer::getBlockList((int)$query);
+        // Block height query — beyond the tip it is an explicit no-result, never silent
         $data['network'] = BATHRONExplorer::getNetworkInfo();
+        $tipNow = (int)($data['network']['blocks'] ?? 0);
+        if ((int)$query > $tipNow) {
+            $page = 'dashboard';
+            $searchMiss = $query;
+            $data['btcspv'] = BATHRONExplorer::getBtcSpvInfo();
+            $data['burns'] = BATHRONExplorer::getBurnStats();
+            $blockData = BATHRONExplorer::getBlockList(null, 5);
+            $data['recent_blocks'] = $blockData['blocks'];
+        } else {
+            $page = 'blocks';
+            $data = BATHRONExplorer::getBlockList((int)$query) + $data;
+        }
     } else {
-        // Default: Dashboard
+        // Default: Dashboard — with an explicit no-result banner when a search missed
         $page = 'dashboard';
+        if ($query !== '' && !in_array($query, ['dashboard', 'home'])) { $searchMiss = $query; }
         $data['network'] = BATHRONExplorer::getNetworkInfo();
         $data['btcspv'] = BATHRONExplorer::getBtcSpvInfo();
         $data['burns'] = BATHRONExplorer::getBurnStats();
@@ -1187,6 +1198,11 @@ try {
     <title><?= COIN_NAME ?> <?= NETWORK ?> Explorer</title>
     <link rel="icon" type="image/png" href="favicon.png">
     <?php if ($page === 'dashboard'): ?>
+        <?php if (!empty($searchMiss)): ?>
+            <div class="card" style="border-color: var(--warning); margin-bottom: 20px; padding: 14px 20px;">
+                No result found for &ldquo;<?= htmlspecialchars($searchMiss, ENT_QUOTES) ?>&rdquo; — search accepts a block height, block hash, transaction id or address.
+            </div>
+        <?php endif; ?>
     <meta http-equiv="refresh" content="<?= REFRESH_TIME ?>">
     <?php endif; ?>
     <style>
@@ -1334,6 +1350,9 @@ try {
         .stat-card .value.accent {
             color: var(--accent-light);
         }
+
+        /* Wide tables scroll inside their card on narrow screens */
+        .card { overflow-x: auto; }
 
         /* Tables */
         .card {
@@ -2446,7 +2465,7 @@ try {
                             Collecting samples… (one per finalized block). The aggregates above come directly from the node.
                         </div>
                     <?php else: ?>
-                        <!-- lane visuelle : derniers blocs finalisés (délai en ms) -->
+                        <!-- visual lane: latest finalized blocks (delay in ms) -->
                         <div style="display: flex; gap: 4px; align-items: flex-end; overflow-x: auto; padding-bottom: 6px;">
                             <?php foreach (array_slice($ftBlocks, -28) as $b):
                                 $d = (int)($b['delay_ms'] ?? 0);
@@ -2456,7 +2475,7 @@ try {
                                 $prodShort = $prod !== '' ? substr($prod, 0, 10) . '…' : '?';
                             ?>
                                 <div style="min-width: 32px; text-align: center; flex-shrink: 0;"
-                                     title="bloc #<?= (int)$b['h'] ?> · producteur <?= htmlspecialchars($prodShort) ?> · finalisé en <?= $d ?>ms">
+                                     title="block #<?= (int)$b['h'] ?> · producer <?= htmlspecialchars($prodShort) ?> · finalized in <?= $d ?>ms">
                                     <div style="height: <?= $barH ?>px; background: <?= $col ?>; border-radius: 3px 3px 0 0;"></div>
                                     <div style="font-size: 9px; color: var(--text-secondary); margin-top: 3px;"><?= $d ?></div>
                                     <div style="font-size: 8px; color: var(--text-muted, var(--text-secondary));">#<?= (int)$b['h'] ?></div>
@@ -2464,7 +2483,7 @@ try {
                             <?php endforeach; ?>
                         </div>
                         <div style="font-size: 11px; color: var(--text-secondary); margin-top: 8px;">
-                            Délai (ms) = production → finalisation, mesuré par le nœud (<code>getfinalitystatus</code>)<?php if ($qSize > 0): ?> · quorum <?= $qThreshold ?>/<?= $qSize ?> opérateurs<?php endif; ?> · survole une barre pour le producteur du bloc.
+                            Delay (ms) = production → finalization, measured by the node (<code>getfinalitystatus</code>)<?php if ($qSize > 0): ?> · quorum <?= $qThreshold ?>/<?= $qSize ?> operators<?php endif; ?> · hover a bar for the block producer.
                         </div>
                     <?php endif; ?>
                 </div>
@@ -2474,20 +2493,20 @@ try {
             <?php
             // Use RPC data ONLY (burnclaimdb is the single source of truth)
             // A5: btc_burned_sats == M0_total by construction
-            $btcTransferred = $data['burns']['btc_transferred'] ?? 0;
+            $btcDestroyed = $data['burns']['btc_destroyed'] ?? 0;
             $txBurnCount = $data['burns']['total_burns'] ?? 0;
             ?>
             <div class="bp30-monetary-table">
                 <!-- BTC Column -->
                 <div class="bp30-column btc">
                     <div class="bp30-column-header">
-                        <div class="title">Total BTC</div>
-                        <div class="subtitle">Transferred</div>
+                        <div class="title">BTC destroyed</div>
+                        <div class="subtitle">Verified burns</div>
                     </div>
                     <div class="bp30-column-body">
                         <a href="?tab=btc" class="bp30-item" style="text-decoration: none; color: inherit;">
                             <span class="item-label">BTC_BURNED_SATS</span>
-                            <span class="item-value"><?= formatSats($btcTransferred, false) ?></span>
+                            <span class="item-value"><?= formatSats($btcDestroyed, false) ?></span>
                         </a>
                         <a href="?tab=btc" class="bp30-item" style="text-decoration: none; color: inherit;">
                             <span class="item-label">TX_BURN_COUNT</span>
@@ -2499,8 +2518,8 @@ try {
                         </a>
                     </div>
                     <div class="bp30-column-total">
-                        <span class="total-label">Total (sats)</span>
-                        <span class="total-value"><?= formatSats($btcTransferred, false) ?></span>
+                        <span class="total-label">Total destroyed (sats)</span>
+                        <span class="total-value"><?= formatSats($btcDestroyed, false) ?></span>
                     </div>
                 </div>
 
@@ -2552,7 +2571,7 @@ try {
                         </div>
                         <div style="flex: 1;"></div>
                         <div style="font-size: 11px; color: var(--text-secondary); padding: 10px 0;">
-                            Transferable claim on vaulted M0
+                            Transferable protocol receipt for vaulted M0 — no redemption or external value implied
                         </div>
                     </div>
                     <div class="bp30-column-total">
@@ -2637,7 +2656,7 @@ try {
             </div>
 
             <!-- 4️⃣ INVARIANT A5 - MONETARY CONSERVATION -->
-            <?php $a5Ok = $data['network']['a5_ok'] ?? ($btcTransferred > 0 && $btcTransferred == $m0Total); ?>
+            <?php $a5Ok = $data['network']['a5_ok'] ?? ($btcDestroyed > 0 && $btcDestroyed == $m0Total); ?>
             <div class="bp30-invariant <?= $a5Ok ? '' : 'broken' ?>">
                 <div class="invariant-header">
                     <span class="icon">&#9878;</span>INVARIANT A5 — MONETARY CONSERVATION
@@ -2646,13 +2665,13 @@ try {
                     BTC_BURNED = M0_TOTAL (all M0 from BTC burns only)
                 </div>
                 <div class="invariant-sum">
-                    <span class="left"><?= formatSats($btcTransferred, false) ?></span>
+                    <span class="left"><?= formatSats($btcDestroyed, false) ?></span>
                     <span class="equals"><?= $a5Ok ? '=' : '&ne;' ?></span>
                     <span class="right"><?= formatSats($m0Total, false) ?></span>
                 </div>
                 <?php if (!$a5Ok && $feesRecycled > 0): ?>
                 <div style="font-size: 11px; color: var(--text-secondary); padding: 4px 0;">
-                    Delta: <?= formatSats(abs($m0Total - $btcTransferred), false) ?> sats (fees recycled in coinbase)
+                    Delta: <?= formatSats(abs($m0Total - $btcDestroyed), false) ?> sats (fees recycled in coinbase)
                 </div>
                 <?php endif; ?>
                 <div class="invariant-status <?= $a5Ok ? 'ok' : 'broken' ?>">
@@ -2660,14 +2679,17 @@ try {
                 </div>
             </div>
 
-            <!-- 6️⃣ INVARIANT A6 - SETTLEMENT BACKING -->
+            <!-- 6️⃣ INVARIANT A6 - VAULT EQUALITY -->
             <?php $a6Ok = $data['network']['a6_ok'] ?? ($m0VaultedActive == $m1Supply); ?>
             <div class="bp30-invariant <?= $a6Ok ? '' : 'broken' ?>">
                 <div class="invariant-header">
-                    <span class="icon">&#9878;</span>INVARIANT A6 — SETTLEMENT BACKING
+                    <span class="icon">&#9878;</span>INVARIANT A6 — VAULT EQUALITY
                 </div>
                 <div class="invariant-equation">
                     M0_VAULTED = M1_SUPPLY
+                </div>
+                <div style="font-size: 12px; color: var(--text-secondary); margin: 4px 0 8px;">
+                    Internal protocol equality; it does not imply redemption, external price or liquidity.
                 </div>
                 <div class="invariant-sum">
                     <span class="left"><?= formatSats($m0VaultedActive, false) ?></span>
@@ -3161,7 +3183,7 @@ try {
                 </div>
                 <div style="padding: 18px 20px;">
                     <?php if ($totalP === 0): ?>
-                        <div style="color: var(--text-secondary); font-size: 13px;">Collecte en cours… (un échantillon par bloc finalisé).</div>
+                        <div style="color: var(--text-secondary); font-size: 13px;">Collecting… (one sample per finalized block).</div>
                     <?php else: ?>
                         <!-- bande : 1 case = 1 bloc, couleur = producteur -->
                         <div style="display: flex; gap: 3px; flex-wrap: wrap; margin-bottom: 16px;">
@@ -3186,7 +3208,7 @@ try {
                         </div>
                         <div style="font-size: 11px; color: var(--text-secondary); margin-top: 14px; border-top: 1px solid var(--border); padding-top: 12px;">
                             <strong>Production (DMM)</strong> = producteur tiré par bloc → tourne entre opérateurs ci-dessus.
-                            <strong>Finalité (VRF)</strong> = comité de finalité sélectionné par sortition VRF<?php if ($qN > 0): ?>, seuil <?= $qT ?>/<?= $qN ?><?php endif; ?> ; à cette échelle les 4 opérateurs sont tous sélectionnés (comité cible ≫ nb d'opérateurs) → la rotation du comité n'apparaîtra qu'avec plus d'opérateurs.
+                            <strong>Finality (VRF)</strong> = the finality committee is drawn by VRF sortition (<code>getquorum</code>)<?php if ($qN > 0): ?>, threshold <?= $qT ?>/<?= $qN ?><?php endif; ?>; at this small testnet scale every operator is selected each block (target committee size ≫ operator count) — committee rotation only becomes visible with more operators.
                         </div>
                     <?php endif; ?>
                 </div>
@@ -3211,18 +3233,16 @@ try {
                                 <th class="sortable" data-sort="rank">#</th>
                                 <th>Operator Key</th>
                                 <th class="sortable sort-desc" data-sort="mns">MNs</th>
-                                <th class="sortable" data-sort="online">Online</th>
-                                <th>Badges</th>
-                                <th class="sortable" data-sort="blocks">Production (DMM)</th>
-                                <th class="sortable" data-sort="anciennete">Ancienneté</th>
-                                <th class="sortable" data-sort="points">Points</th>
-                            </tr>
+                                <th class="sortable" data-sort="eligible" title="Consensus eligibility (registered, not PoSe-banned, no penalty) — NOT a reachability or availability measure">Eligible</th>
+                                                                <th class="sortable" data-sort="blocks">Production (DMM)</th>
+                                <th class="sortable" data-sort="age">Age</th>
+                                                            </tr>
                         </thead>
                         <tbody>
                             <?php $sortition = BATHRONExplorer::getSortition(); ?>
                             <?php $i = 1; foreach ($data['operators'] as $op): ?>
                             <?php $so = $sortition[$op['operatorPubKey']] ?? null; ?>
-                            <tr data-rank="<?= $i ?>" data-mns="<?= $op['activeMNs'] ?>" data-online="<?= $op['onlineMNs'] ?>" data-blocks="<?= $so['blocksProduced'] ?? ($op['blocksProduced'] ?? 0) ?>" data-anciennete="<?= $op['ancienneteDays'] ?>" data-points="<?= round($op['reputationScore'] ?? 0) ?>">
+                            <tr data-rank="<?= $i ?>" data-mns="<?= $op['activeMNs'] ?>" data-eligible="<?= $op['onlineMNs'] ?>" data-blocks="<?= $so['blocksProduced'] ?? ($op['blocksProduced'] ?? 0) ?>" data-age="<?= $op['ancienneteDays'] ?>">
                                 <td><?= $i++ ?></td>
                                 <td class="hash truncate" style="max-width: 140px;" title="<?= $op['operatorPubKey'] ?>">
                                     <?= substr($op['operatorPubKey'], 0, 12) ?>...<?= substr($op['operatorPubKey'], -6) ?>
@@ -3242,35 +3262,14 @@ try {
                                         <span class="badge-offline">0/<?= $op['activeMNs'] ?></span>
                                     <?php endif; ?>
                                 </td>
-                                <td style="font-size: 10px;">
-                                    <?php if (!empty($op['badges'])): ?>
-                                        <?php
-                                        $badgeLabels = [
-                                            'genesis_operator' => 'Genesis',
-                                            'multi_mn'         => 'Multi-MN',
-                                            'solo_operator'    => 'Solo',
-                                            'top_producer'     => 'Top producer',
-                                            'reliable'         => 'Fiable',
-                                        ];
-                                        $icons = $op['badgeIcons'] ?? [];
-                                        foreach ($op['badges'] as $bi => $badge):
-                                            $label = $badgeLabels[$badge] ?? ucwords(str_replace('_', ' ', $badge));
-                                            $icon = $icons[$bi] ?? '';
-                                        ?>
-                                            <span title="<?= htmlspecialchars($badge) ?>" style="display:inline-flex;align-items:center;gap:3px;background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-primary);border-radius:4px;padding:2px 6px;margin:1px;font-size:11px;white-space:nowrap;"><?= $icon !== '' ? $icon . ' ' : '' ?><?= htmlspecialchars($label) ?></span>
-                                        <?php endforeach; ?>
-                                    <?php else: ?>
-                                        <span style="color: var(--text-secondary);">-</span>
-                                    <?php endif; ?>
-                                </td>
-                                <td style="text-align: center; font-size: 12px;">
+                                                               <td style="text-align: center; font-size: 12px;">
                                     <?php if ($so !== null): ?>
-                                        <span style="color: var(--accent-light); font-weight: 600;" title="Blocs produits (DMM)"><?= number_format($so['blocksProduced']) ?></span>
+                                        <span style="color: var(--accent-light); font-weight: 600;" title="Blocks produced (DMM)"><?= number_format($so['blocksProduced']) ?></span>
                                         <?php
                                             $devNum = floatval(str_replace(['%', '+', ' '], '', (string)$so['deviation']));
                                             $devCol = abs($devNum) <= 20 ? 'var(--success)' : (abs($devNum) <= 50 ? 'var(--warning)' : 'var(--danger, #f85149)');
                                         ?>
-                                        <div style="font-size: 10px; color: var(--text-secondary); margin-top: 2px;" title="Part de production réelle / attendue · déviation (équité de production DMM)">
+                                        <div style="font-size: 10px; color: var(--text-secondary); margin-top: 2px;" title="Actual vs expected production share · deviation (DMM fairness)">
                                             <?= (int)$so['sharePercent'] ?>% / <?= (int)$so['expectedShare'] ?>%
                                             <?php if ($so['deviation'] !== ''): ?>
                                                 <span style="color: <?= $devCol ?>; font-weight: 600;"><?= htmlspecialchars((string)$so['deviation']) ?></span>
@@ -3282,20 +3281,12 @@ try {
                                 </td>
                                 <td style="font-size: 12px;">
                                     <?php if ($op['ancienneteDays'] > 0): ?>
-                                        <?= $op['ancienneteDays'] ?>j
+                                        <?= $op['ancienneteDays'] ?>d
                                     <?php else: ?>
                                         <span style="color: var(--text-secondary);">Genesis</span>
                                     <?php endif; ?>
                                 </td>
-                                <td style="text-align: center;">
-                                    <?php $rep = round($op['reputationScore'] ?? 0); ?>
-                                    <?php if ($rep > 0): ?>
-                                        <span style="color: var(--accent-light); font-weight: 600;" title="Score de réputation 0-100 (voir légende en bas)"><?= $rep ?></span><span style="color: var(--text-secondary); font-size: 10px;"> pts</span>
-                                    <?php else: ?>
-                                        <span style="color: var(--text-secondary);">-</span>
-                                    <?php endif; ?>
-                                </td>
-                            </tr>
+                                                            </tr>
                             <?php endforeach; ?>
                         </tbody>
                     </table>
@@ -3312,33 +3303,54 @@ try {
                     <p>In BATHRON, operators are the unit of consensus participation:</p>
                     <ul style="margin-left: 20px; margin-top: 10px;">
                         <li><strong>1 Operator = 1 Finality Signature</strong> - regardless of how many MNs they manage</li>
-                        <li><strong>DMM Production</strong> - block producers are drawn per block by the DMM scheduler (random rotation)</li>
+                        <li><strong>DMM Production</strong> - block producers are drawn per block by the DMM scheduler (deterministic pseudorandom scheduling from the previous block hash)</li>
                         <li><strong>VRF Finality</strong> - a VRF-sorted operator committee finalizes; one signature covers all an operator's MNs</li>
                         <li><strong>Multi-MN Daemon</strong> - run multiple MNs on a single server</li>
                     </ul>
                 </div>
             </div>
 
-            <!-- 🏅 LÉGENDE BADGES & RÉPUTATION -->
-            <div class="card" style="margin-top: 20px;">
-                <div class="card-header">🏅 Légende — badges & réputation</div>
-                <div style="padding: 18px 20px;">
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px 24px; font-size: 13px;">
-                        <div><span style="font-size: 15px;">🏆</span> <strong>Genesis</strong> — enregistré au bloc ≤ 100</div>
-                        <div><span style="font-size: 15px;">⚡</span> <strong>Multi-MN</strong> — gère 2+ masternodes</div>
-                        <div><span style="font-size: 15px;">⚡⚡</span> <strong>Multi-MN ×5</strong> — gère 5+ masternodes</div>
-                        <div><span style="font-size: 15px;">⚡⚡⚡</span> <strong>Multi-MN ×10</strong> — gère 10+ masternodes</div>
-                        <div><span style="font-size: 15px;">✓</span> <strong>Perfect uptime</strong> — production ≥ 99% de l'attendu</div>
-                        <div><span style="font-size: 15px;">📈</span> <strong>High producer</strong> — production > 105% de l'attendu</div>
-                        <div><span style="font-size: 15px;">🎖️</span> <strong>Veteran</strong> — actif depuis 1000+ blocs</div>
-                        <div><span style="font-size: 15px;">🐋</span> <strong>Whale</strong> — collatéral ≥ 50 000 BATHRON</div>
+            <!-- Experimental derived metrics (collapsed; NOT consensus) -->
+            <details class="card" style="margin-top: 20px;">
+                <summary style="cursor: pointer; padding: 14px 20px; font-weight: 600;">Experimental derived metrics <span style="color: var(--text-secondary); font-weight: normal;">— not consensus</span></summary>
+                <div style="padding: 0 20px 18px; font-size: 13px; color: var(--text-secondary); line-height: 1.7;">
+                    <p style="margin: 8px 0;"><strong style="color: var(--text-primary);">Informational classifications computed from the node's <code>getoperatorinfo</code> RPC.</strong>
+                    They are <strong>not consensus values</strong> and have <strong>no effect on admission, finality, rewards or operator selection</strong>
+                    (the protocol publishes facts and never ranks — 1 operator = 1 vote).</p>
+                    <p style="margin: 8px 0;"><strong style="color: var(--text-primary);">Score formula (0–100)</strong> = production vs expected share <strong>40%</strong>
+                    + managed MN count <strong>20%</strong> (cap 5) + age since registration <strong>20%</strong> (cap 1,000 blocks)
+                    + derived classifications <strong>20%</strong> (cap 4). Window: whole chain since each operator's registration; sources:
+                    <code>listmnstats</code>, <code>listoperators</code>, registration heights.</p>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 8px 24px; margin-top: 10px;">
+                        <div>🏆 <strong>Genesis</strong> — derived: registered at block ≤ 100</div>
+                        <div>⚡ <strong>Multi-MN</strong> — derived: manages 2+ masternodes</div>
+                        <div>✓ <strong>Production ≥ expected</strong> — at or above 99% of expected share</div>
+                        <div>📈 <strong>Production above expected</strong> — above 105% of expected share</div>
+                        <div>🎖️ <strong>Long-running</strong> — derived: active for 1,000+ blocks</div>
+                        <div>🐋 <strong>High registered collateral</strong> — derived: high collateral, unit = sats</div>
                     </div>
-                    <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 14px; font-size: 12px; color: var(--text-secondary); line-height: 1.7;">
-                        <strong style="color: var(--text-primary);">Réputation (0–100 pts)</strong> = uptime/production <strong>40%</strong> + nombre de MN <strong>20%</strong> (plafond 5) + ancienneté <strong>20%</strong> (plafond 1000 blocs) + badges <strong>20%</strong> (plafond 4 badges).
-                        Indicateur calculé par le nœud (`getoperatorinfo`) — informatif, <em>pas</em> un paramètre de consensus.
-                    </div>
+                    <table style="margin-top: 14px; font-size: 12px;">
+                        <thead><tr><th>Operator</th><th>Derived classifications</th><th>Score</th></tr></thead>
+                        <tbody>
+                        <?php foreach (($data['operators'] ?? []) as $op): if (empty($op['operatorPubKey'])) continue;
+                            $labels = [
+                                'genesis_operator' => 'Genesis', 'multi_mn' => 'Multi-MN', 'solo_operator' => 'Solo',
+                                'top_producer' => 'Production above expected', 'reliable' => 'Production >= expected',
+                                'perfect_uptime' => 'Production >= expected', 'whale' => 'High registered collateral',
+                                'veteran' => 'Long-running', 'high_producer' => 'Production above expected',
+                            ]; ?>
+                            <tr>
+                                <td style="font-family: monospace;"><?= htmlspecialchars(substr($op['operatorPubKey'], 0, 10)) ?>…</td>
+                                <td><?php $bs = [];
+                                    foreach (($op['badges'] ?? []) as $b) { $bs[] = $labels[$b] ?? ucwords(str_replace('_',' ',$b)); }
+                                    echo htmlspecialchars($bs ? implode(' · ', $bs) : '—'); ?></td>
+                                <td><?= round($op['reputationScore'] ?? 0) ?>/100</td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
                 </div>
-            </div>
+            </details>
 
         <?php elseif ($page === 'masternodes'): ?>
             <!-- MASTERNODES LIST (Individual MNs) -->
@@ -3415,8 +3427,8 @@ try {
                                 <td style="text-align: center; font-size: 12px;">
                                     <?php $ms = $mnStats[$mn['proTxHash']] ?? null; ?>
                                     <?php if ($ms): ?>
-                                        <span style="color: var(--accent-light); font-weight: 600;" title="Blocs produits par ce MN"><?= number_format($ms['blocksProduced']) ?></span>
-                                        <div style="font-size: 10px; color: var(--text-secondary); margin-top: 2px;" title="Part de production réelle / attendue sur le réseau (équité de production DMM)">
+                                        <span style="color: var(--accent-light); font-weight: 600;" title="Blocks produced by this MN"><?= number_format($ms['blocksProduced']) ?></span>
+                                        <div style="font-size: 10px; color: var(--text-secondary); margin-top: 2px;" title="Actual vs expected production share network-wide (DMM fairness)">
                                             <?= round($ms['productionRate'], 1) ?>% <span style="color: var(--text-muted, var(--text-secondary));">/ <?= round($ms['expectedRate'], 1) ?>%</span>
                                         </div>
                                     <?php else: ?>
@@ -3919,8 +3931,8 @@ bitcoin-cli -signet sendrawtransaction "SIGNED_TX"</pre>
                                 <ol style="margin-left: 16px; line-height: 1.8;">
                                     <li>You send BTC to the burn address</li>
                                     <li>Wait 6 confirmations (~1 hour)</li>
-                                    <li>Burn is auto-detected by the network</li>
-                                    <li>M0BTC minted 1:1 to your address</li>
+                                    <li>A relayer submits the burn claim — submission is permissionless (any node can submit one via <code>submitburnclaim</code>)</li>
+                                    <li>Consensus validates the claim against the Bitcoin SPV state, then M0 is minted 1:1 to your address</li>
                                 </ol>
                             </div>
                             <div>
@@ -3981,7 +3993,7 @@ bitcoin-cli -signet sendrawtransaction "SIGNED_TX"</pre>
                     let bVal = b.dataset[sortKey];
 
                     // Numeric sort for these columns
-                    if (['rank', 'mns', 'online', 'anciennete', 'score'].includes(sortKey)) {
+                    if (['rank', 'mns', 'eligible', 'age'].includes(sortKey)) {
                         aVal = parseFloat(aVal) || 0;
                         bVal = parseFloat(bVal) || 0;
                         return isAsc ? bVal - aVal : aVal - bVal;
