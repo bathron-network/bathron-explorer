@@ -894,17 +894,14 @@ class BATHRONExplorer
             // Registered height
             $registeredHeight = $state['registeredHeight'] ?? 0;
 
-            // Calculate score (higher = better priority for next payment)
-            // Score based on: blocks since last paid (more = higher score)
-            $lastPaidHeight = $state['lastPaidHeight'] ?? 0;
-            $blocksSinceLastPaid = ($lastPaidHeight > 0) ? ($currentHeight - $lastPaidHeight) : $currentHeight;
-            $score = $blocksSinceLastPaid;
-
-            // Reduce score if banned or has penalty
+            // Ordering score — BATHRON has NO masternode payments (reward=0):
+            // active first, PoSe-penalized after, PoSe-banned last.
             if ($status === 'POSE_BANNED') {
-                $score = -1;
+                $score = -1000;
             } elseif ($status === 'POSE_PENALTY') {
-                $score = $score - ($posePenalty * 10);
+                $score = -$posePenalty;
+            } else {
+                $score = 0;
             }
 
             $masternodes[] = [
@@ -920,7 +917,6 @@ class BATHRONExplorer
                 'status' => $status,
                 'poseBanHeight' => $banHeight,
                 'posePenalty' => $posePenalty,
-                'lastPaidHeight' => $lastPaidHeight,
                 'registeredHeight' => $registeredHeight,
                 'isOnline' => $isOnline,
                 'lastSeenElapsed' => $lastSuccessElapsed,
@@ -928,9 +924,10 @@ class BATHRONExplorer
             ];
         }
 
-        // Sort by score (highest first = next to be paid)
+        // Sort: active first (PoSe-banned last), then oldest registration first
         usort($masternodes, function($a, $b) {
-            return $b['score'] - $a['score'];
+            if ($a['score'] !== $b['score']) return $b['score'] - $a['score'];
+            return ($a['registeredHeight'] ?? 0) - ($b['registeredHeight'] ?? 0);
         });
 
         return $masternodes;
@@ -1013,16 +1010,16 @@ class BATHRONExplorer
                 $operatorMap[$operatorPubKey]['oldestRegistration'] = $registeredHeight;
             }
 
-            // Score
-            $lastPaidHeight = $state['lastPaidHeight'] ?? 0;
-            $blocksSinceLastPaid = ($lastPaidHeight > 0) ? ($currentHeight - $lastPaidHeight) : $currentHeight;
-            $score = $blocksSinceLastPaid;
+            // Ordering score — no masternode payments in BATHRON (reward=0):
+            // 1 point per healthy MN, PoSe penalties subtract, bans count 0.
             if ($status === 'POSE_BANNED') {
-                $score = -1;
+                $score = 0;
             } elseif ($status === 'POSE_PENALTY') {
-                $score = $score - ($posePenalty * 10);
+                $score = max(0, 1 - $posePenalty);
+            } else {
+                $score = 1;
             }
-            $operatorMap[$operatorPubKey]['totalScore'] += max(0, $score);
+            $operatorMap[$operatorPubKey]['totalScore'] += $score;
 
             // Service IP
             $service = $state['service'] ?? '';
@@ -1039,7 +1036,6 @@ class BATHRONExplorer
                 'status' => $status,
                 'isOnline' => $isOnline,
                 'registeredHeight' => $registeredHeight,
-                'lastPaidHeight' => $lastPaidHeight,
                 'score' => $score,
             ];
 
@@ -2376,7 +2372,7 @@ try {
                 </div>
                 <?php $dashFinPart = BATHRONExplorer::getFinalityParticipation(32); ?>
                 <div class="bp30-quick-stat">
-                    <div class="label" title="Opérateurs ayant signé la finalité dans les 32 derniers blocs finalisés — la mesure de VIVACITÉ réelle (source : store de finalité consensus)">Finality</div>
+                    <div class="label" title="Operators that signed finality over the last 32 finalized blocks — the real LIVENESS measure (source: the node's consensus finality store)">Finality</div>
                     <div class="value" style="color: <?= $data['network']['finality_status'] === 'healthy' ? 'var(--success)' : 'var(--warning)' ?>;">
                         <?= strtoupper($data['network']['finality_status']) ?>
                     </div>
@@ -2392,7 +2388,7 @@ try {
                     </div>
                 </div>
                 <div class="bp30-quick-stat">
-                    <div class="label" title="Opérateurs de consensus (1 opérateur = 1 voix de finalité) ; MNs = entrées enregistrées dans la liste déterministe (état consensus, pas vivacité)">Operators</div>
+                    <div class="label" title="Consensus operators (1 operator = 1 finality vote); MNs = entries registered in the deterministic list (consensus state, not liveness)">Operators</div>
                     <div class="value"><?= $data['network']['operators_count'] ?></div>
                     <div class="sub"><?= $data['network']['masternodes_active'] ?>/<?= $data['network']['masternodes_total'] ?> MNs registered</div>
                 </div>
@@ -2429,25 +2425,25 @@ try {
                     <!-- agrégats : le nœud mesure le délai en ms (getfinalitystatus) -->
                     <div style="display: flex; gap: 28px; margin-bottom: 18px; flex-wrap: wrap;">
                         <div>
-                            <div style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Délai moyen <span style="text-transform: none;">(nœud)</span></div>
+                            <div style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Avg delay <span style="text-transform: none;">(node)</span></div>
                             <div style="font-size: 24px; font-weight: 700; color: var(--success);"><?= $fmtMs($ftAvgNode) ?></div>
                         </div>
                         <div>
-                            <div style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Dernier</div>
+                            <div style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Last</div>
                             <div style="font-size: 24px; font-weight: 700;"><?= $fmtMs($ftLastNode) ?></div>
                         </div>
                         <div>
-                            <div style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Max observé</div>
+                            <div style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Max observed</div>
                             <div style="font-size: 24px; font-weight: 700; color: <?= $ftMax > 1000 ? 'var(--warning)' : 'var(--text-primary)' ?>;"><?= $ftN ? $fmtMs($ftMax) : '—' ?></div>
                         </div>
                         <div>
-                            <div style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Échantillons</div>
+                            <div style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Samples</div>
                             <div style="font-size: 24px; font-weight: 700; color: var(--text-secondary);"><?= $ftN ?></div>
                         </div>
                     </div>
                     <?php if ($ftN === 0): ?>
                         <div style="color: var(--text-secondary); font-size: 13px;">
-                            Lane en cours de collecte… (un échantillon par bloc finalisé). Les agrégats ci-dessus viennent directement du nœud.
+                            Collecting samples… (one per finalized block). The aggregates above come directly from the node.
                         </div>
                     <?php else: ?>
                         <!-- lane visuelle : derniers blocs finalisés (délai en ms) -->
@@ -3129,7 +3125,7 @@ try {
                     <div class="value accent"><?= count($data['operators']) ?></div>
                 </div>
                 <div class="stat-card">
-                    <div class="label" title="MNs valides (non PoSe-ban) dans la liste déterministe — état d'enregistrement, pas vivacité (cf. colonne Finality)">Valid MNs (reg.)</div>
+                    <div class="label" title="Valid MNs (not PoSe-banned) in the deterministic list — registration state, not liveness (see the Finality column)">Valid MNs (reg.)</div>
                     <div class="value"><?= $data['network']['masternodes_active'] ?></div>
                 </div>
                 <div class="stat-card">
@@ -3160,8 +3156,8 @@ try {
             ?>
             <div class="card" style="margin-bottom: 20px;">
                 <div class="card-header">
-                    <span>⟳ Rotation des producteurs (DMM)</span>
-                    <span style="font-weight: normal; font-size: 12px; color: var(--text-secondary);">chaque couleur = un opérateur · producteur tiré par bloc (DMM)</span>
+                    <span>⟳ Producer rotation (DMM)</span>
+                    <span style="font-weight: normal; font-size: 12px; color: var(--text-secondary);">each color = one operator · producer drawn per block (DMM)</span>
                 </div>
                 <div style="padding: 18px 20px;">
                     <?php if ($totalP === 0): ?>
@@ -3184,7 +3180,7 @@ try {
                                 <div style="display: flex; align-items: center; gap: 7px; font-size: 12px;">
                                     <span style="width: 12px; height: 12px; border-radius: 3px; background: <?= $opColors[$p] ?>; display: inline-block;"></span>
                                     <span class="hash" title="<?= htmlspecialchars($p) ?>"><?= htmlspecialchars(substr($p, 0, 10)) ?>…</span>
-                                    <span style="color: var(--text-secondary);"><?= $cnt ?> blocs · <?= $pct ?>%</span>
+                                    <span style="color: var(--text-secondary);"><?= $cnt ?> blocks · <?= $pct ?>%</span>
                                 </div>
                             <?php endforeach; ?>
                         </div>
@@ -3348,7 +3344,7 @@ try {
             <!-- MASTERNODES LIST (Individual MNs) -->
             <div class="stats-grid">
                 <div class="stat-card">
-                    <div class="label" title="MNs valides (non PoSe-ban) dans la liste déterministe — état d'enregistrement, pas vivacité (cf. colonne Finality)">Valid MNs (reg.)</div>
+                    <div class="label" title="Valid MNs (not PoSe-banned) in the deterministic list — registration state, not liveness (see the Finality column)">Valid MNs (reg.)</div>
                     <div class="value accent"><?= $data['network']['masternodes_active'] ?></div>
                 </div>
                 <div class="stat-card">
@@ -3391,8 +3387,7 @@ try {
                                 <th>Service IP</th>
                                 <th>Status</th>
                                 <th>Production (DMM)</th>
-                                <th title="Signatures de finalité de l'OPÉRATEUR de ce MN sur les 32 derniers blocs (1 voix par opérateur — un opérateur multi-MN signe via un seul MN). Source : store de finalité consensus du nœud.">Finality (32 blk)</th>
-                                <th>Last produced</th>
+                                <th title="Finality signatures of this MN's OPERATOR over the last 32 blocks (1 vote per operator — a multi-MN operator signs through a single MN). Source: the node's consensus finality store.">Finality (32 blk)</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -3438,19 +3433,12 @@ try {
                                         $pct = (int)round($fp['rate'] * 100);
                                         $color = $pct >= 90 ? 'var(--success, #4caf50)' : ($pct >= 50 ? 'var(--warning, #ff9800)' : 'var(--danger, #f44336)');
                                         ?>
-                                        <span style="color: <?= $color ?>; font-weight: 600;" title="Signé <?= $fp['signed'] ?> des <?= $fpTotal ?> derniers blocs finalisés (opérateur)"><?= $fp['signed'] ?>/<?= $fpTotal ?></span>
+                                        <span style="color: <?= $color ?>; font-weight: 600;" title="Signed <?= $fp['signed'] ?> of the last <?= $fpTotal ?> finalized blocks (operator)"><?= $fp['signed'] ?>/<?= $fpTotal ?></span>
                                         <div style="font-size: 10px; color: var(--text-secondary); margin-top: 2px;">
-                                            <?= $pct ?>%<?php if ($fp['signed'] === 0 && $fp['last_signed_height'] === 0): ?> <span title="Jamais signé dans la fenêtre — MN pas encore éligible (confirmedHash) ou opérateur muet">silencieux</span><?php endif; ?>
+                                            <?= $pct ?>%<?php if ($fp['signed'] === 0 && $fp['last_signed_height'] === 0): ?> <span title="Never signed inside the window — MN not yet eligible (confirmedHash) or silent operator">silent</span><?php endif; ?>
                                         </div>
                                     <?php else: ?>
-                                        <span style="color: var(--text-secondary);" title="Donnée indisponible (RPC getfinalityparticipation absent ou aucun bloc finalisé dans la fenêtre)">n/a</span>
-                                    <?php endif; ?>
-                                </td>
-                                <td style="font-size: 12px;">
-                                    <?php if ($mn['lastPaidHeight'] > 0): ?>
-                                        Block <?= number_format($mn['lastPaidHeight']) ?>
-                                    <?php else: ?>
-                                        <span style="color: var(--text-secondary);">Never</span>
+                                        <span style="color: var(--text-secondary);" title="Data unavailable (getfinalityparticipation RPC missing or no finalized block in the window)">n/a</span>
                                     <?php endif; ?>
                                 </td>
                             </tr>
