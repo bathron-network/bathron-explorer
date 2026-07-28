@@ -74,13 +74,19 @@ Checks: PHP lint, fail-closed behavior without credentials, config parsing,
 and the anti-secret / anti-server-path guards (no credentials, no `/home/...`
 paths, no operator IPs, no generated data tracked by git).
 
-## Transport note
+## Public instance
 
-The reference public instance is currently served over **plain HTTP** (an
-experimental testnet demonstrator — it displays public chain data and holds
-no secrets). Do not treat it as a trusted endpoint. An HTTPS migration
-(reverse proxy + certificate) is planned as a separate operational change;
-self-hosters are encouraged to front `public/` with TLS from day one.
+The reference public instance is served over HTTPS at:
+
+**https://explorer.bathron.org/**
+
+(HTTP requests on port 80 are redirected; the certificate is publicly issued
+and auto-renewed.) The BATHRON **Seed P2P endpoint and the explorer are two
+distinct services**: the explorer is a read-only web view run as a
+demonstrator, with no availability guarantee — nodes join the network through
+the Seed documented by
+[bathron-core](https://github.com/bathron-network/bathron-core), never through
+the explorer. Self-hosters should likewise front `public/` with TLS.
 
 ## Security
 
