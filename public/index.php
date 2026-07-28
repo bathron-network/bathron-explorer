@@ -1225,6 +1225,10 @@ try {
             box-sizing: border-box;
         }
 
+        html, body {
+            max-width: 100%;
+        }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
             background: var(--bg-primary);
@@ -1285,6 +1289,7 @@ try {
 
         .search-box input {
             flex: 1;
+            min-width: 0;
             padding: 12px 18px;
             border: 1px solid var(--border);
             border-radius: 8px;
@@ -1593,7 +1598,24 @@ try {
         .nav-tabs {
             display: flex;
             gap: 5px;
+            max-width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin;
+            padding: 0 4px 4px;
         }
+
+        .nav-tab { flex: 0 0 auto; }
+
+        .table-scroll {
+            overflow-x: auto;
+            max-width: 100%;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .table-scroll table { min-width: max-content; }
+
+        .finality-hdr { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; align-items: baseline; }
 
         .nav-tab {
             padding: 8px 16px;
@@ -2275,7 +2297,8 @@ try {
             }
 
             .search-box input {
-                width: 250px;
+                width: 100%;
+                min-width: 0;
             }
 
             .stats-grid {
@@ -2432,9 +2455,9 @@ try {
             $fmtMs = fn($ms) => $ms >= 1000 ? round($ms / 1000, 2) . 's' : ((int)$ms) . 'ms';
             ?>
             <div class="card" style="margin-bottom: 25px;">
-                <div class="card-header">
+                <div class="card-header finality-hdr">
                     <span>⚡ Finality — produced → finalized</span>
-                    <span style="font-weight: normal; font-size: 13px; color: var(--text-secondary);">
+                    <span class="finality-sub" style="font-weight: normal; font-size: 13px; color: var(--text-secondary);">
                         lag <span style="color: <?= $ft['lag'] > 0 ? 'var(--warning)' : 'var(--success)' ?>; font-weight: 600;"><?= (int)$ft['lag'] ?></span>
                         · <span style="color: <?= $ftStatusColor ?>;"><?= strtoupper(htmlspecialchars($ft['status'])) ?></span>
                         <?php if ($qSize > 0): ?> · quorum <span style="color: var(--accent-light); font-weight: 600;"><?= $qThreshold ?>/<?= $qSize ?></span><?php endif; ?>
@@ -2707,7 +2730,7 @@ try {
                     <span>Recent Blocks</span>
                     <a href="?tab=blocks" style="font-weight: normal; font-size: 14px;">View all &rarr;</a>
                 </div>
-                <table>
+                <div class="table-scroll"><table>
                     <thead>
                         <tr>
                             <th>Height</th>
@@ -2728,7 +2751,7 @@ try {
                         </tr>
                         <?php endforeach; ?>
                     </tbody>
-                </table>
+                </table></div>
             </div>
 
         <?php elseif ($page === 'blocks'): ?>
@@ -2757,7 +2780,7 @@ try {
                         Auto-refresh: <?= REFRESH_TIME ?>s
                     </span>
                 </div>
-                <table>
+                <div class="table-scroll"><table>
                     <thead>
                         <tr>
                             <th>Height</th>
@@ -2784,7 +2807,7 @@ try {
                         </tr>
                         <?php endforeach; ?>
                     </tbody>
-                </table>
+                </table></div>
             </div>
 
             <!-- Pagination -->
@@ -2966,7 +2989,7 @@ try {
                 <!-- Inputs -->
                 <div class="card">
                     <div class="card-header">Inputs (<?= count($data['inputs']) ?>)</div>
-                    <table>
+                    <div class="table-scroll"><table>
                         <thead>
                             <tr>
                                 <th>From</th>
@@ -3007,13 +3030,13 @@ try {
                             </tr>
                             <?php endif; ?>
                         </tbody>
-                    </table>
+                    </table></div>
                 </div>
 
                 <!-- Outputs -->
                 <div class="card">
                     <div class="card-header">Outputs (<?= count($data['outputs']) ?>)</div>
-                    <table>
+                    <div class="table-scroll"><table>
                         <thead>
                             <tr>
                                 <th>To</th>
@@ -3046,7 +3069,7 @@ try {
                                 <td><strong><?= formatSats($data['total_out'], false) ?> <?= COIN_TICKER ?></strong></td>
                             </tr>
                         </tbody>
-                    </table>
+                    </table></div>
                 </div>
             </div>
 
@@ -3092,7 +3115,7 @@ try {
                         No transactions found in the last <?= $data['blocks_scanned'] ?> blocks.
                     </div>
                 <?php else: ?>
-                    <table>
+                    <div class="table-scroll"><table>
                         <thead>
                             <tr>
                                 <th>Transaction</th>
@@ -3131,7 +3154,7 @@ try {
                             </tr>
                             <?php endforeach; ?>
                         </tbody>
-                    </table>
+                    </table></div>
                 <?php endif; ?>
             </div>
 
@@ -3160,7 +3183,7 @@ try {
                 </div>
             </div>
 
-            <!-- ⟳ ROTATION DES PRODUCTEURS (DMM) -->
+            <!-- ⟳ PRODUCER ROTATION (DMM) -->
             <?php
             $ftR = BATHRONExplorer::getFinalityTrack();
             $ftRBlocks = $ftR['blocks'] ?? [];
@@ -3185,13 +3208,13 @@ try {
                     <?php if ($totalP === 0): ?>
                         <div style="color: var(--text-secondary); font-size: 13px;">Collecting… (one sample per finalized block).</div>
                     <?php else: ?>
-                        <!-- bande : 1 case = 1 bloc, couleur = producteur -->
+                        <!-- band: 1 cell = 1 block, color = producer -->
                         <div style="display: flex; gap: 3px; flex-wrap: wrap; margin-bottom: 16px;">
                             <?php foreach (array_slice($ftRBlocks, -60) as $b):
                                 $p = $b['producer'] ?? '';
                                 $c = $p !== '' ? $opColors[$p] : 'var(--bg-tertiary)';
                             ?>
-                                <div title="bloc #<?= (int)$b['h'] ?> · <?= htmlspecialchars(substr($p, 0, 14)) ?>…" style="width: 14px; height: 26px; background: <?= $c ?>; border-radius: 2px;"></div>
+                                <div title="block #<?= (int)$b['h'] ?> · <?= htmlspecialchars(substr($p, 0, 14)) ?>…" style="width: 14px; height: 26px; background: <?= $c ?>; border-radius: 2px;"></div>
                             <?php endforeach; ?>
                         </div>
                         <!-- légende : opérateur, couleur, part produite -->
@@ -3207,7 +3230,7 @@ try {
                             <?php endforeach; ?>
                         </div>
                         <div style="font-size: 11px; color: var(--text-secondary); margin-top: 14px; border-top: 1px solid var(--border); padding-top: 12px;">
-                            <strong>Production (DMM)</strong> = producteur tiré par bloc → tourne entre opérateurs ci-dessus.
+                            <strong>Production (DMM)</strong> = the producer is drawn per block → rotates across the operators above.
                             <strong>Finality (VRF)</strong> = the finality committee is drawn by VRF sortition (<code>getquorum</code>)<?php if ($qN > 0): ?>, threshold <?= $qT ?>/<?= $qN ?><?php endif; ?>; at this small testnet scale every operator is selected each block (target committee size ≫ operator count) — committee rotation only becomes visible with more operators.
                         </div>
                     <?php endif; ?>
@@ -3227,7 +3250,7 @@ try {
                         No operators registered.
                     </div>
                 <?php else: ?>
-                    <table id="op-table">
+                    <div class="table-scroll"><table id="op-table">
                         <thead>
                             <tr>
                                 <th class="sortable" data-sort="rank">#</th>
@@ -3289,7 +3312,7 @@ try {
                                                             </tr>
                             <?php endforeach; ?>
                         </tbody>
-                    </table>
+                    </table></div>
                 <?php endif; ?>
             </div>
 
@@ -3329,7 +3352,7 @@ try {
                         <div>🎖️ <strong>Long-running</strong> — derived: active for 1,000+ blocks</div>
                         <div>🐋 <strong>High registered collateral</strong> — derived: high collateral, unit = sats</div>
                     </div>
-                    <table style="margin-top: 14px; font-size: 12px;">
+                    <div class="table-scroll"><table style="margin-top: 14px; font-size: 12px;">
                         <thead><tr><th>Operator</th><th>Derived classifications</th><th>Score</th></tr></thead>
                         <tbody>
                         <?php foreach (($data['operators'] ?? []) as $op): if (empty($op['operatorPubKey'])) continue;
@@ -3348,7 +3371,7 @@ try {
                             </tr>
                         <?php endforeach; ?>
                         </tbody>
-                    </table>
+                    </table></div>
                 </div>
             </details>
 
@@ -3390,7 +3413,7 @@ try {
                         <?php endif; ?>
                     </div>
                 <?php else: ?>
-                    <table id="mn-table">
+                    <div class="table-scroll"><table id="mn-table">
                         <thead>
                             <tr>
                                 <th>#</th>
@@ -3456,7 +3479,7 @@ try {
                             </tr>
                             <?php endforeach; ?>
                         </tbody>
-                    </table>
+                    </table></div>
                 <?php endif; ?>
             </div>
 
@@ -3548,7 +3571,7 @@ try {
                         <?= count($burnsPending) ?> awaiting confirmation
                     </span>
                 </div>
-                <table>
+                <div class="table-scroll"><table>
                     <thead>
                         <tr>
                             <th>BTC TXID</th>
@@ -3572,7 +3595,7 @@ try {
                         </tr>
                         <?php endforeach; ?>
                     </tbody>
-                </table>
+                </table></div>
             </div>
             <?php endif; ?>
 
@@ -3701,7 +3724,7 @@ try {
                         No burns detected. Scanning burn address...
                     </div>
                 <?php else: ?>
-                    <table>
+                    <div class="table-scroll"><table>
                         <thead>
                             <tr>
                                 <th>BTC TXID</th>
@@ -3784,7 +3807,7 @@ try {
                             </tr>
                             <?php endforeach; ?>
                         </tbody>
-                    </table>
+                    </table></div>
                 <?php endif; ?>
             </div>
 
