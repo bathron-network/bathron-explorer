@@ -256,7 +256,7 @@ class BATHRONExplorer
             'can_publish' => false,
             'min_supported_height' => 0,
             'spv_ready' => false,
-            'network' => 'signet',
+            'network' => '',
             'db_initialized' => false,
         ];
 
@@ -279,7 +279,7 @@ class BATHRONExplorer
                 $result['spv_synced'] = $sync['synced'] ?? false;
                 $result['spv_tip_hash'] = substr($sync['tip_hash'] ?? '', 0, 16);
                 $result['spv_ready'] = $sync['spv_ready'] ?? false;
-                $result['network'] = $sync['network'] ?? 'signet';
+                $result['network'] = $sync['network'] ?? '';
                 $result['min_supported_height'] = $sync['min_supported_height'] ?? 0;
             }
         } catch (Exception $e) {
@@ -400,12 +400,14 @@ class BATHRONExplorer
 
         // Try to read from genesis_burns.json (multiple locations)
         // NOTE: genesis_burns_spv.json removed - daemon-only flow uses burnclaimdb
+        // Genesis burns are CHAIN-SPECIFIC data. The path must be configured per
+        // deployment; there is deliberately NO repo/webroot fallback. A shipped
+        // file would otherwise be shown by every deployment — a measurement
+        // chain would display another chain's burns as its own (observed in
+        // staging: two historical burns surfaced under a Testnet4 banner).
         $cfgPaths = bathron_rpc_config();
         $paths = array_filter([
-            ($cfgPaths !== false ? ($cfgPaths['genesis_burns'] ?? '') : ''), // env override
-            __DIR__ . '/genesis_burns.json',                        // Same dir as explorer (deployed)
-            dirname(__DIR__) . '/genesis_burns.json',               // Repo/install root
-            __DIR__ . '/../../contrib/testnet/genesis_burns.json',  // In-repo layout
+            ($cfgPaths !== false ? ($cfgPaths['genesis_burns'] ?? '') : ''),
         ]);
 
         foreach ($paths as $path) {
@@ -1187,6 +1189,34 @@ try {
 } catch (Exception $e) {
     $data['error'] = $e->getMessage();
 }
+
+/* ============ DEPLOYMENT IDENTITY (single source of truth for the UI) ========
+   The Bitcoin source network is read from the NODE (getbtcsyncstatus.network,
+   which the chain commits at genesis), never guessed and never hardcoded.
+   Configuration only supplies the value shown when the RPC has not answered.
+   Unknown network => neutral label and NO external link (fail closed).        */
+$siteCfg          = bathron_site_config();
+$btcNetwork       = $data['btcspv']['network'] ?? '';
+if ($btcNetwork === '') $btcNetwork = $siteCfg['btc_source'];
+$btcExplorerBase  = bathron_btc_explorer_base($btcNetwork);
+$btcChainFlag     = ($btcNetwork !== '') ? $btcNetwork : 'main';
+$btcNetworkLabels = [
+    'testnet4' => 'Bitcoin Testnet4 / BIP-94',
+    'mainnet'  => 'Bitcoin mainnet',
+    'main'     => 'Bitcoin mainnet',
+];
+$btcNetworkLabel  = $btcNetworkLabels[strtolower($btcNetwork)] ?? ($btcNetwork !== '' ? 'Bitcoin ' . $btcNetwork : 'Bitcoin (network not reported)');
+$btcFaucetsByNet  = [
+    // Test-coin faucets only. Verified reachable 2026-08-03; a faucet is a
+    // convenience link, never a dependency, and never receives anything but a
+    // public address.
+    'testnet4' => ['faucet.testnet4.dev' => 'https://faucet.testnet4.dev/',
+                   'coinfaucet.eu (testnet4)' => 'https://coinfaucet.eu/en/btc-testnet4/'],
+];
+$btcFaucets       = $btcFaucetsByNet[strtolower($btcNetwork)] ?? [];
+$networkLabel     = $siteCfg['network_label'];              // '' on the public deployment
+$fundingAddress   = $siteCfg['funding_address'];            // '' hides the funding panel
+$fundingTarget    = $siteCfg['funding_target_sats'];
 
 // ============ HTML OUTPUT ============
 ?>
@@ -2343,6 +2373,17 @@ try {
     </style>
 </head>
 <body>
+<?php if ($networkLabel !== ''): ?>
+    <!-- Disposable-network banner. Shown ONLY when BATHRON_NETWORK_LABEL is set,
+         i.e. never on the public deployment. -->
+    <div style="background:#7a4d00;color:#ffe9c2;padding:10px 0;border-bottom:1px solid #a86a00;font-size:14px;">
+        <div class="container" style="display:flex;flex-wrap:wrap;gap:8px;align-items:baseline;">
+            <strong style="letter-spacing:.02em;">Disposable measurement network</strong>
+            <span><?= htmlspecialchars($networkLabel) ?> — Bitcoin source: <?= htmlspecialchars($btcNetworkLabel) ?>.
+            Coins and balances here carry no monetary value; the chain is reset at will.</span>
+        </div>
+    </div>
+<?php endif; ?>
     <header>
         <div class="container">
             <a href="./" class="logo">
@@ -2614,7 +2655,7 @@ try {
             $spvSynced = $btcspv['spv_synced'] ?? false;
             $spvReady = $btcspv['spv_ready'] ?? false;
             $minHeight = $btcspv['min_supported_height'] ?? 0;
-            $network = $btcspv['network'] ?? 'signet';
+            $network = $btcspv['network'] ?? bathron_site_config()['btc_source'];
             $dbInit = $btcspv['db_initialized'] ?? false;
             ?>
             <div class="bp30-yield btc-bridge-panel">
@@ -3500,7 +3541,7 @@ try {
             $sync = $btc['sync'] ?? [];
             $spvTip = $sync['tip_height'] ?? 0;
             $spvSynced = $sync['synced'] ?? false;
-            $spvNetwork = $sync['network'] ?? 'signet';
+            $spvNetwork = $sync['network'] ?? bathron_site_config()['btc_source'];
 
             // Burn stats (from burnclaimdb - single source of truth)
             $burnStats = $btc['burn_stats'] ?? [];
@@ -3527,6 +3568,37 @@ try {
                     </span>
                 </div>
                 <div style="padding: 20px;">
+                    <!-- Which Bitcoin chain this BATHRON chain is committed to, and
+                         the pinned starting header. Both come from the node
+                         (getbtcsyncstatus), which reports the value the chain
+                         committed at genesis — the UI never assumes a network. -->
+                    <div style="margin-bottom: 16px; padding: 12px 15px; background: var(--bg-tertiary); border-radius: 8px; border-left: 3px solid #f7931a;">
+                        <div style="display:flex; flex-wrap:wrap; gap:6px 26px; font-size:13px;">
+                            <span><span style="color: var(--text-secondary);">Bitcoin source network:</span>
+                                  <strong><?= htmlspecialchars($btcNetworkLabels[strtolower((string)$spvNetwork)] ?? ($spvNetwork !== '' ? 'Bitcoin ' . $spvNetwork : 'not reported by the node')) ?></strong></span>
+<?php
+    $spvCheckpointH = $sync['btc_genesis_checkpoint_height'] ?? ($sync['min_supported_height'] ?? 0);
+    $spvCheckpointHash = $sync['btc_genesis_checkpoint_hash'] ?? '';
+?>
+<?php if ($spvCheckpointH > 0): ?>
+                            <span><span style="color: var(--text-secondary);">SPV genesis checkpoint:</span>
+                                  <strong style="font-family: monospace;"><?= number_format($spvCheckpointH) ?></strong>
+<?php if ($spvCheckpointHash !== ''): ?>
+                                  <?php if ($btcExplorerBase !== ''): ?>
+                                  <a href="<?= htmlspecialchars($btcExplorerBase) ?>/block/<?= htmlspecialchars($spvCheckpointHash) ?>"
+                                     target="_blank" rel="noopener noreferrer"
+                                     style="color: var(--accent); font-family: monospace; font-size: 12px;"><?= substr(htmlspecialchars($spvCheckpointHash), 0, 16) ?>…</a>
+                                  <?php else: ?>
+                                  <span style="font-family: monospace; font-size: 12px; color: var(--text-secondary);"><?= substr(htmlspecialchars($spvCheckpointHash), 0, 16) ?>…</span>
+                                  <?php endif; ?>
+<?php endif; ?>
+                            </span>
+<?php endif; ?>
+                        </div>
+                        <div style="font-size: 11px; color: var(--text-secondary); margin-top: 6px;">
+                            Headers below the checkpoint are not tracked; burns are only verifiable from it onwards.
+                        </div>
+                    </div>
                     <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px;">
                         <div style="padding: 15px; background: var(--bg-tertiary); border-radius: 8px;">
                             <div style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase;">Chain BTC Headers</div>
@@ -3584,7 +3656,7 @@ try {
                         <?php foreach ($burnsPending as $burn): ?>
                         <tr>
                             <td>
-                                <a href="https://mempool.space/signet/tx/<?= htmlspecialchars($burn['btc_txid'] ?? '') ?>"
+                                <a href="<?= htmlspecialchars($btcExplorerBase) ?>/tx/<?= htmlspecialchars($burn['btc_txid'] ?? '') ?>"
                                    target="_blank" style="color: var(--accent); font-family: monospace; font-size: 12px;">
                                     <?= substr($burn['btc_txid'] ?? '', 0, 16) ?>...
                                 </a>
@@ -3599,7 +3671,7 @@ try {
             </div>
             <?php endif; ?>
 
-            <!-- Detected Burns (Live from BTC Signet) -->
+            <!-- Detected Burns (live from the committed Bitcoin source network) -->
             <?php
             // Fetch detected burns from mempool.space API
             $detectedBurns = [];
@@ -3620,13 +3692,13 @@ try {
             // vers mempool.space). Cache fichier 30s : ne tape pas l'API à chaque rendu (auto-refresh 30s),
             // garde l'onglet réactif même si mempool ralentit, et sert le dernier cache si mempool tombe.
             $mempoolData = false;
-            $cacheFile   = sys_get_temp_dir() . '/bathron_mempool_burns.json';
+            $cacheFile   = bathron_cache_path('mempool_burns.json', $btcNetwork);
             $cacheTtl    = 30;
             if (is_readable($cacheFile) && (time() - filemtime($cacheFile)) < $cacheTtl) {
                 $mempoolData = file_get_contents($cacheFile);
             }
             if ($mempoolData === false && function_exists('curl_init')) {
-                $ch = curl_init("https://mempool.space/signet/api/address/{$burnAddress}/txs");
+                $ch = curl_init("{$btcExplorerBase}/api/address/{$burnAddress}/txs");
                 curl_setopt_array($ch, [
                     CURLOPT_RETURNTRANSFER => true,
                     CURLOPT_CONNECTTIMEOUT => 4,
@@ -3716,7 +3788,7 @@ try {
                 <div class="card-header">
                     <span>Detected Burns (Live)</span>
                     <span style="color: var(--text-secondary); font-weight: normal; font-size: 14px;">
-                        <?= count($detectedBurns) ?> burns on BTC Signet
+                        <?= count($detectedBurns) ?> burns on <?= htmlspecialchars($btcNetworkLabel) ?>
                     </span>
                 </div>
                 <?php if (empty($detectedBurns)): ?>
@@ -3761,7 +3833,7 @@ try {
                             ?>
                             <tr style="<?= !$burn['confirmed'] ? 'opacity: 0.6;' : '' ?>">
                                 <td>
-                                    <a href="https://mempool.space/signet/tx/<?= htmlspecialchars($burn['txid']) ?>"
+                                    <a href="<?= htmlspecialchars($btcExplorerBase) ?>/tx/<?= htmlspecialchars($burn['txid']) ?>"
                                        target="_blank" style="color: var(--accent); font-family: monospace; font-size: 12px;">
                                         <?= substr($burn['txid'], 0, 12) ?>...<?= substr($burn['txid'], -6) ?>
                                     </a>
@@ -3821,7 +3893,7 @@ try {
                             <ol style="margin-left: 20px;">
                                 <li>Send BTC to unspendable P2WSH address</li>
                                 <li>Include OP_RETURN with destination</li>
-                                <li>Wait for 6 confirmations on Signet</li>
+                                <li>Wait for 6 confirmations on <?= htmlspecialchars($btcNetworkLabel) ?></li>
                                 <li>SPV proof validates burn on BATHRON</li>
                                 <li>M0BTC minted 1:1 to destination</li>
                             </ol>
@@ -3841,6 +3913,75 @@ try {
 
         <?php elseif ($page === 'join'): ?>
             <!-- JOIN PAGE -->
+<?php if ($fundingAddress !== ''): ?>
+            <!-- ============ MEASUREMENT FUNDING PANEL ==========================
+                 Shown ONLY when MEASUREMENT_FUNDING_ADDRESS is configured, i.e.
+                 never on the public deployment. Receive-only: the address is
+                 public, the balance is read from a public block explorer, and
+                 this application has NO access to any spending wallet.        -->
+            <div class="card" style="border-color: var(--accent); margin-bottom: 20px;">
+                <h2 style="margin-bottom: 12px;">Funding the measurement network</h2>
+                <p style="color: var(--text-secondary); margin-bottom: 14px;">
+                    Bitcoin Testnet4 coins have no monetary value.
+                    Funding is used only for the disposable BATHRON measurement network.
+                </p>
+                <table style="width:100%; font-size: 14px;">
+                    <tr><td style="padding:6px 0; color: var(--text-secondary); width: 170px;">Receive address</td>
+                        <td style="font-family: monospace; word-break: break-all;"><?= htmlspecialchars($fundingAddress) ?></td></tr>
+                    <tr><td style="padding:6px 0; color: var(--text-secondary);">Bitcoin network</td>
+                        <td><?= htmlspecialchars($btcNetworkLabel) ?></td></tr>
+<?php if ($fundingTarget > 0): ?>
+                    <tr><td style="padding:6px 0; color: var(--text-secondary);">Target</td>
+                        <td style="font-family: monospace;"><?= number_format($fundingTarget) ?> sats</td></tr>
+<?php endif; ?>
+<?php
+    // Public balance, read from the external explorer and cached per network.
+    // This is a CROSS-CHECK convenience only — never a consensus source, and it
+    // never touches a wallet RPC.
+    $fundBal = null;
+    if ($btcExplorerBase !== '' && function_exists('curl_init')) {
+        $fc = bathron_cache_path('funding_balance.json', $btcNetwork);
+        $raw = (is_readable($fc) && (time() - filemtime($fc)) < 60) ? file_get_contents($fc) : false;
+        if ($raw === false) {
+            $ch = curl_init($btcExplorerBase . '/api/address/' . rawurlencode($fundingAddress));
+            curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_CONNECTTIMEOUT => 4,
+                                    CURLOPT_TIMEOUT => 6, CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
+                                    CURLOPT_USERAGENT => 'BATHRON-Explorer']);
+            $resp = curl_exec($ch);
+            if ($resp !== false && (int)curl_getinfo($ch, CURLINFO_HTTP_CODE) === 200) {
+                $raw = $resp; @file_put_contents($fc, $resp, LOCK_EX);
+            }
+            curl_close($ch);
+        }
+        if ($raw) {
+            $j = json_decode($raw, true);
+            if (is_array($j) && isset($j['chain_stats'])) {
+                $fundBal = ['confirmed' => (int)$j['chain_stats']['funded_txo_sum'] - (int)$j['chain_stats']['spent_txo_sum'],
+                            'pending' => (int)($j['mempool_stats']['funded_txo_sum'] ?? 0) - (int)($j['mempool_stats']['spent_txo_sum'] ?? 0)];
+            }
+        }
+    }
+?>
+                    <tr><td style="padding:6px 0; color: var(--text-secondary);">Balance</td>
+                        <td style="font-family: monospace;">
+                            <?php if ($fundBal !== null): ?>
+                                <?= number_format($fundBal['confirmed']) ?> sats confirmed<?php if ($fundBal['pending'] !== 0): ?>,
+                                <?= number_format($fundBal['pending']) ?> sats pending<?php endif; ?>
+<?php if ($fundingTarget > 0): ?>
+                                <span style="color: var(--text-secondary);">(<?= round(100 * $fundBal['confirmed'] / max(1, $fundingTarget)) ?>% of target)</span>
+<?php endif; ?>
+                            <?php else: ?>
+                                <span style="color: var(--text-secondary);">unavailable — check the explorer link</span>
+                            <?php endif; ?>
+                        </td></tr>
+<?php if ($btcExplorerBase !== ''): ?>
+                    <tr><td style="padding:6px 0; color: var(--text-secondary);">Cross-check</td>
+                        <td><a href="<?= htmlspecialchars($btcExplorerBase) ?>/address/<?= htmlspecialchars($fundingAddress) ?>"
+                               target="_blank" rel="noopener noreferrer" style="color: var(--accent);">view on the public explorer</a></td></tr>
+<?php endif; ?>
+                </table>
+            </div>
+<?php endif; ?>
             <?php
             $burnAddr = 'tb1qdc6qh88lkdaf3899gnntk7q293ufq8flkvmnsa59zx3sv9a05qwsdh5h09';
             $joinAddr = isset($_GET['addr']) ? trim($_GET['addr']) : '';
@@ -3882,7 +4023,7 @@ except: print('ERROR:invalid address')
                 <div class="card-header">Join BATHRON — Burn BTC to mint M0</div>
                 <div style="padding: 30px;">
                     <p style="color: var(--text-secondary); margin-bottom: 25px; line-height: 1.6;">
-                        Burn BTC on Signet to receive M0BTC on BATHRON testnet. 1 satoshi burned = 1 M0 minted.<br>
+                        Burn BTC on <?= htmlspecialchars($btcNetworkLabel) ?> to receive M0BTC on this BATHRON chain. 1 satoshi destroyed = 1 M0 minted.<br>
                         The burn is <strong>irreversible</strong> — BTC is sent to a provably unspendable address.
                     </p>
 
@@ -3926,20 +4067,20 @@ except: print('ERROR:invalid address')
                     <div style="background: var(--bg-primary); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 20px;">
                         <p style="color: var(--accent); font-weight: bold; margin-bottom: 15px;">Quick command (bitcoin-cli)</p>
                         <pre style="background: #0d1117; color: #c9d1d9; padding: 16px; border-radius: 6px; overflow-x: auto; font-size: 13px; line-height: 1.6; margin: 0;"># Create burn TX (replace AMOUNT with BTC amount, e.g. 0.0001)
-bitcoin-cli -signet createrawtransaction "[]" \
+bitcoin-cli -chain=<?= htmlspecialchars($btcChainFlag) ?> createrawtransaction "[]" \
   "{\"data\":\"<?= $joinMetadata ?>\",\"<?= $burnAddr ?>\":AMOUNT}"
 
 # Then fund, sign, and broadcast:
-bitcoin-cli -signet fundrawtransaction "RAW_TX"
-bitcoin-cli -signet signrawtransactionwithwallet "FUNDED_TX"
-bitcoin-cli -signet sendrawtransaction "SIGNED_TX"</pre>
+bitcoin-cli -chain=<?= htmlspecialchars($btcChainFlag) ?> fundrawtransaction "RAW_TX"
+bitcoin-cli -chain=<?= htmlspecialchars($btcChainFlag) ?> signrawtransactionwithwallet "FUNDED_TX"
+bitcoin-cli -chain=<?= htmlspecialchars($btcChainFlag) ?> sendrawtransaction "SIGNED_TX"</pre>
                     </div>
 
                     <!-- Step 4: Or use the script -->
                     <div style="background: var(--bg-primary); border: 1px solid var(--border); border-radius: 8px; padding: 20px;">
                         <p style="color: var(--accent); font-weight: bold; margin-bottom: 15px;">Or use the automated script</p>
                         <pre style="background: #0d1117; color: #c9d1d9; padding: 16px; border-radius: 6px; overflow-x: auto; font-size: 13px; line-height: 1.6; margin: 0;"># One command — handles everything automatically
-./burn_signet.sh <?= htmlspecialchars($joinAddr) ?> 10000</pre>
+./burn_btc.sh <?= htmlspecialchars($joinAddr) ?> 10000</pre>
                         <p style="color: var(--text-secondary); font-size: 13px; margin-top: 10px;">
                             Get it: <a href="https://github.com/bathron-network/bathron-core/tree/main/contrib/node-tools" target="_blank" style="color: var(--accent);">bathron-core/contrib/node-tools</a>
                         </p>
@@ -3962,16 +4103,20 @@ bitcoin-cli -signet sendrawtransaction "SIGNED_TX"</pre>
                                 <p style="color: var(--text-primary); font-weight: bold; margin-bottom: 8px;">Requirements</p>
                                 <ul style="margin-left: 16px; line-height: 1.8;">
                                     <li>Min burn: <strong>1,000 sats</strong></li>
-                                    <li>Network: BTC <strong>Signet</strong></li>
+                                    <li>Network: <strong><?= htmlspecialchars($btcNetworkLabel) ?></strong></li>
                                     <li>Conversion: <strong>1:1</strong> (1 sat = 1 M0)</li>
                                     <li>Fee: <strong>0</strong> (claim is free)</li>
                                 </ul>
                             </div>
                             <div>
-                                <p style="color: var(--text-primary); font-weight: bold; margin-bottom: 8px;">Get Signet BTC</p>
+                                <p style="color: var(--text-primary); font-weight: bold; margin-bottom: 8px;">Get test BTC</p>
                                 <ul style="margin-left: 16px; line-height: 1.8;">
-                                    <li><a href="https://signetfaucet.com" target="_blank" style="color: var(--accent);">signetfaucet.com</a></li>
-                                    <li><a href="https://alt.signetfaucet.com" target="_blank" style="color: var(--accent);">alt.signetfaucet.com</a></li>
+                                    <?php foreach ($btcFaucets as $fLabel => $fUrl): ?>
+                                    <li><a href="<?= htmlspecialchars($fUrl) ?>" target="_blank" rel="noopener noreferrer" style="color: var(--accent);"><?= htmlspecialchars($fLabel) ?></a></li>
+                                    <?php endforeach; ?>
+                                    <?php if (!$btcFaucets): ?>
+                                    <li style="color: var(--text-secondary);">No faucet for this network.</li>
+                                    <?php endif; ?>
                                 </ul>
                             </div>
                         </div>

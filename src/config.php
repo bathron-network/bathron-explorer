@@ -64,8 +64,80 @@ function bathron_rpc_config() {
         'dex_url' => $vals['BATHRON_DEX_URL'] ?? '',
         'state_file' => $vals['BATHRON_STATE_FILE'] ?? '',
         'genesis_burns' => $vals['BATHRON_GENESIS_BURNS'] ?? '',
+        // --- deployment identity (see bathron_site_config) -------------------
+        'network_label' => $vals['BATHRON_NETWORK_LABEL'] ?? '',
+        'btc_source' => $vals['BITCOIN_SOURCE_NETWORK'] ?? '',
+        'btc_explorer_base' => $vals['BITCOIN_EXPLORER_BASE'] ?? '',
+        'funding_address' => $vals['MEASUREMENT_FUNDING_ADDRESS'] ?? '',
+        'funding_target_sats' => (int)($vals['MEASUREMENT_FUNDING_TARGET_SATS'] ?? 0),
+        'cache_dir' => $vals['BATHRON_CACHE_DIR'] ?? '',
     ];
     return $cfg;
+}
+
+/*
+    Deployment identity — lets ONE codebase serve several BATHRON chains without
+    ever mixing their state. Every value is configuration; nothing about a
+    Bitcoin network is hardcoded here.
+
+      BATHRON_NETWORK_LABEL   banner text ('' = no banner, the default public
+                              deployment)
+      BITCOIN_SOURCE_NETWORK  the Bitcoin network this chain reads as its
+                              monetary source. AUTHORITATIVE VALUE comes from the
+                              BATHRON RPC (getbtcsyncstatus.network, which is
+                              consensus-committed); this variable is only the
+                              value shown before/without RPC, and there is NO
+                              hardcoded fallback to any network.
+      BITCOIN_EXPLORER_BASE   external Bitcoin explorer used ONLY for
+                              cross-checking links (never as a data source)
+      MEASUREMENT_FUNDING_*   public receive address + target, funding panel is
+                              hidden when the address is empty
+      BATHRON_CACHE_DIR       per-deployment cache directory. Two deployments
+                              MUST NOT share it (that would mix chain state).
+*/
+function bathron_site_config() {
+    static $s = null;
+    if ($s !== null) return $s;
+    $c = bathron_rpc_config();
+    $s = [
+        'network_label' => is_array($c) ? ($c['network_label'] ?? '') : '',
+        'btc_source' => is_array($c) ? ($c['btc_source'] ?? '') : '',
+        'btc_explorer_base' => is_array($c) ? ($c['btc_explorer_base'] ?? '') : '',
+        'funding_address' => is_array($c) ? ($c['funding_address'] ?? '') : '',
+        'funding_target_sats' => is_array($c) ? ($c['funding_target_sats'] ?? 0) : 0,
+        'cache_dir' => is_array($c) ? ($c['cache_dir'] ?? '') : '',
+    ];
+    return $s;
+}
+
+/*
+    External Bitcoin explorer base URL for cross-check links.
+    Derived from the network the NODE reports, so a link can never point at a
+    different chain than the one the consensus tracks. Unknown network => no
+    link at all (fail closed rather than guess).
+*/
+function bathron_btc_explorer_base($network) {
+    $s = bathron_site_config();
+    if ($s['btc_explorer_base'] !== '') return rtrim($s['btc_explorer_base'], '/');
+    switch (strtolower((string)$network)) {
+        case 'testnet4': return 'https://mempool.space/testnet4';
+        case 'mainnet':
+        case 'main':     return 'https://mempool.space';
+        default:         return '';   // unknown network: no link, no guess
+    }
+}
+
+/*
+    Per-deployment cache path. Falls back to a network-namespaced file in the
+    system temp dir so that two deployments on one host still never collide.
+*/
+function bathron_cache_path($name, $network = '') {
+    $s = bathron_site_config();
+    $ns = preg_replace('/[^a-z0-9_-]/i', '', (string)($network !== '' ? $network : $s['btc_source']));
+    if ($ns === '') $ns = 'unknown';
+    $dir = $s['cache_dir'] !== '' ? rtrim($s['cache_dir'], '/') : sys_get_temp_dir();
+    if (!is_dir($dir)) @mkdir($dir, 0750, true);
+    return $dir . '/bathron_' . $ns . '_' . preg_replace('/[^a-z0-9_.-]/i', '', $name);
 }
 
 function bathron_rpc_unavailable() {

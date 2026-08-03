@@ -184,9 +184,13 @@ class Bitcoin
             $this->error = $curl_error;
         }
 
-        if ($this->response['error']) {
+        // When the node is unreachable the response is null, not an array:
+        // indexing it raised "Trying to access array offset on null" on every
+        // call. Harmless with display_errors=Off, but it floods logs and hides
+        // real warnings — and an explorer must degrade quietly, not noisily.
+        if (is_array($this->response) && isset($this->response['error']) && $this->response['error']) {
             // If bitcoind returned an error, put that in $this->error
-            $this->error = $this->response['error']['message'];
+            $this->error = $this->response['error']['message'] ?? 'RPC_ERROR';
         } elseif ($this->status != 200) {
             // If bitcoind didn't return a nice error message, we need to make our own
             switch ($this->status) {
