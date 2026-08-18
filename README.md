@@ -11,7 +11,17 @@ chain tip, blocks, settlement supply and invariants (A5/A6/A7), finality
 All data is read from a **local BATHRON node** over RPC — the explorer serves
 nothing it cannot verify against its own node.
 
-Canonical documentation: **https://bathron.org/docs/**
+Canonical documentation: **https://bathron.org/docs/** — what the network can and cannot do
+today is stated once, at <https://bathron.org/docs/consensus/status-and-claims.html>; this
+README describes only the explorer software.
+
+> **Bitcoin network of this source tree.** The current measurement network reads **Bitcoin
+> testnet4**. This repository's burn how-to panel and its mempool.space links are still wired
+> for the **signet**-era testnet (`bitcoin-cli -signet`, `mempool.space/signet`, signet faucets),
+> and the deployed instance at <https://explorer.bathron.org/> has been adapted ahead of this
+> source tree. Until the two are reconciled, treat the in-app "How to burn" panel of a build from
+> this repository as historical; the canonical burn format is
+> <https://bathron.org/docs/reference/spv.html#burn-format-bcs-v10>.
 
 ## Layout
 
