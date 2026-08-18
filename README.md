@@ -8,8 +8,10 @@ Lightweight PHP block explorer for the [BATHRON](https://bathron.org) network:
 chain tip, blocks, settlement supply and invariants (A5/A6/A7), finality
 (quorum, per-block delay), operators, in-consensus Bitcoin SPV state.
 
-All data is read from a **local BATHRON node** over RPC — the explorer serves
-nothing it cannot verify against its own node.
+BATHRON chain data is read from a **local BATHRON node** over RPC — the explorer serves no
+consensus data it cannot verify against its own node. The burn panel additionally queries a
+public Bitcoin API (`mempool.space`) for Bitcoin-side transaction lists; that data is
+informational and not verified by the node.
 
 Canonical documentation: **https://bathron.org/docs/** — what the network can and cannot do
 today is stated once, at <https://bathron.org/docs/consensus/status-and-claims.html>; this
