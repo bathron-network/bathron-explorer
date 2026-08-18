@@ -8,10 +8,22 @@ Lightweight PHP block explorer for the [BATHRON](https://bathron.org) network:
 chain tip, blocks, settlement supply and invariants (A5/A6/A7), finality
 (quorum, per-block delay), operators, in-consensus Bitcoin SPV state.
 
-All data is read from a **local BATHRON node** over RPC — the explorer serves
-nothing it cannot verify against its own node.
+BATHRON chain data is read from a **local BATHRON node** over RPC — the explorer serves no
+consensus data it cannot verify against its own node. The burn panel additionally queries a
+public Bitcoin API (`mempool.space`) for Bitcoin-side transaction lists; that data is
+informational and not verified by the node.
 
-Canonical documentation: **https://bathron.org/docs/**
+Canonical documentation: **https://bathron.org/docs/** — what the network can and cannot do
+today is stated once, at <https://bathron.org/docs/consensus/status-and-claims.html>; this
+README describes only the explorer software.
+
+> **Bitcoin network of this source tree.** The current measurement network reads **Bitcoin
+> testnet4**. This repository's burn how-to panel and its mempool.space links are still wired
+> for the **signet**-era testnet (`bitcoin-cli -signet`, `mempool.space/signet`, signet faucets),
+> and the deployed instance at <https://explorer.bathron.org/> has been adapted ahead of this
+> source tree. Until the two are reconciled, treat the in-app "How to burn" panel of a build from
+> this repository as historical; the canonical burn format is
+> <https://bathron.org/docs/reference/spv.html#burn-format-bcs-v10>.
 
 ## Layout
 
@@ -52,6 +64,10 @@ with a generic "data temporarily unavailable" page: no fallback, no default
 password, no connection detail ever reaches the browser.
 
 ## Run
+
+> Local/dev run only. **Do not redeploy <https://explorer.bathron.org/> from this tree** until
+> the live instance's testnet4 changes have been brought back into this repository (see the
+> network note above) — a deploy from here would regress the public explorer to signet-era code.
 
 ```bash
 # web UI: serve public/ (example with the PHP built-in server behind a proxy)
