@@ -65,6 +65,10 @@ password, no connection detail ever reaches the browser.
 
 ## Run
 
+> Local/dev run only. **Do not redeploy <https://explorer.bathron.org/> from this tree** until
+> the live instance's testnet4 changes have been brought back into this repository (see the
+> network note above) — a deploy from here would regress the public explorer to signet-era code.
+
 ```bash
 # web UI: serve public/ (example with the PHP built-in server behind a proxy)
 php -S 127.0.0.1:3001 -t public/
