@@ -1,8 +1,7 @@
 # BATHRON Explorer
 
-> **Status: experimental public-testnet explorer.** A working demonstrator for
-> the BATHRON public testnet. No mainnet exists. No availability guarantee.
-> Interfaces may change without notice.
+> **Network status:** <https://bathron.org/docs/status.html>. This explorer was built for the
+> former DMM public testnet; this repository is kept for reference.
 
 Lightweight PHP block explorer for the [BATHRON](https://bathron.org) network:
 chain tip, blocks, settlement supply and invariants (A5/A6/A7), finality
@@ -13,16 +12,14 @@ consensus data it cannot verify against its own node. The burn panel additionall
 public Bitcoin API (`mempool.space`) for Bitcoin-side transaction lists; that data is
 informational and not verified by the node.
 
-Canonical documentation: **https://bathron.org/docs/** — what the network can and cannot do
-today is stated once, at <https://bathron.org/docs/consensus/status-and-claims.html>; this
-README describes only the explorer software.
+Canonical documentation: **https://bathron.org/docs/** — network status:
+<https://bathron.org/docs/status.html>; this README describes only the explorer software.
 
-> **Bitcoin network of this source tree.** The current measurement network reads **Bitcoin
+> **Bitcoin network of this source tree.** The former DMM measurement network used **Bitcoin
 > testnet4**. This repository's burn how-to panel and its mempool.space links are still wired
-> for the **signet**-era testnet (`bitcoin-cli -signet`, `mempool.space/signet`, signet faucets),
-> and the deployed instance at <https://explorer.bathron.org/> has been adapted ahead of this
-> source tree. Until the two are reconciled, treat the in-app "How to burn" panel of a build from
-> this repository as historical; the canonical burn format is
+> for the **signet**-era testnet (`bitcoin-cli -signet`, `mempool.space/signet`, signet faucets);
+> the instance deployed for the DMM testnet had been adapted ahead of this source tree. Treat the
+> in-app "How to burn" panel of a build from this repository as historical; the canonical burn format is
 > <https://bathron.org/docs/reference/spv.html#burn-format-bcs-v10>.
 
 ## Layout
@@ -33,9 +30,13 @@ src/        shared code (config loader, RPC client) — outside the webroot
 tracker/    finality_tracker.php — daemon feeding the finality panel
 contrib/systemd/  example unit for the tracker
 tests/      configuration & anti-secret checks
+maintenance/  static stand-by page for the public hostname (plain HTML, no PHP, no external resource)
 ```
 
 ## Requirements
+
+> **Historical.** The requirements, configuration and run instructions below describe running the
+> explorer against a node of the former DMM public testnet.
 
 - PHP 8.x with `curl` (php-fpm or `php -S` behind a reverse proxy)
 - A synced BATHRON node on the same machine (`bathrond -testnet`) with RPC
@@ -65,9 +66,8 @@ password, no connection detail ever reaches the browser.
 
 ## Run
 
-> Local/dev run only. **Do not redeploy <https://explorer.bathron.org/> from this tree** until
-> the live instance's testnet4 changes have been brought back into this repository (see the
-> network note above) — a deploy from here would regress the public explorer to signet-era code.
+> Local/dev run only. **Do not deploy this PHP tree to <https://explorer.bathron.org/>**: that
+> hostname is meant to serve only the static page in `maintenance/`.
 
 ```bash
 # web UI: serve public/ (example with the PHP built-in server behind a proxy)
@@ -92,17 +92,7 @@ paths, no operator IPs, no generated data tracked by git).
 
 ## Public instance
 
-The reference public instance is served over HTTPS at:
-
-**https://explorer.bathron.org/**
-
-(HTTP requests on port 80 are redirected; the certificate is publicly issued
-and auto-renewed.) The BATHRON **Seed P2P endpoint and the explorer are two
-distinct services**: the explorer is a read-only web view run as a
-demonstrator, with no availability guarantee — nodes join the network through
-the Seed documented by
-[bathron-core](https://github.com/bathron-network/bathron-core), never through
-the explorer. Self-hosters should likewise front `public/` with TLS.
+This explorer was built for the former DMM public testnet. Network status: <https://bathron.org/docs/status.html>.
 
 ## Security
 
