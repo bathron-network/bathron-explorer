@@ -1,6 +1,7 @@
 # Security policy
 
-The BATHRON explorer is an **experimental public-testnet** component. It is
+The BATHRON explorer is an **experimental** component built for the former DMM public
+testnet (network status: <https://bathron.org/docs/status.html>). It is
 designed to hold no secrets in code and to fail closed, but it has not been
 audited.
 
