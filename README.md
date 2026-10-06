@@ -3,9 +3,14 @@
 > **Network status:** <https://bathron.org/docs/status.html>. This explorer was built for the
 > former DMM public testnet; this repository is kept for reference.
 
-Lightweight PHP block explorer for the [BATHRON](https://bathron.org) network:
-chain tip, blocks, settlement supply and invariants (A5/A6/A7), finality
-(quorum, per-block delay), operators, in-consensus Bitcoin SPV state.
+Lightweight PHP block explorer for the former [BATHRON](https://bathron.org) DMM network:
+chain tip, blocks, settlement supply and invariants (A5/A6/A7), legacy quorum certificates
+and per-block delay, block producers, and in-consensus Bitcoin SPV state.
+
+The current N application draft defines M0 as the only settlement asset. Settlement Providers
+(SPs) and Liquidity Providers (LPs) are roles outside consensus; neither requires a registered
+identity. Producers are registered identities selected to produce blocks. There is no native
+finality in N. This explorer remains legacy DMM software and does not implement the N model.
 
 BATHRON chain data is read from a **local BATHRON node** over RPC — the explorer serves no
 consensus data it cannot verify against its own node. The burn panel additionally queries a
@@ -19,15 +24,15 @@ Canonical documentation: **https://bathron.org/docs/** — network status:
 > testnet4**. This repository's burn how-to panel and its mempool.space links are still wired
 > for the **signet**-era testnet (`bitcoin-cli -signet`, `mempool.space/signet`, signet faucets);
 > the instance deployed for the DMM testnet had been adapted ahead of this source tree. Treat the
-> in-app "How to burn" panel of a build from this repository as historical; the canonical burn format is
-> <https://bathron.org/docs/reference/spv.html#burn-format-bcs-v10>.
+> in-app "How to burn" panel of a build from this repository as historical; current burn rules are explained at
+> <https://bathron.org/docs/burns.html>, with application formats still reserved.
 
 ## Layout
 
 ```
 public/     webroot (index.php + assets) — point your web server HERE only
 src/        shared code (config loader, RPC client) — outside the webroot
-tracker/    finality_tracker.php — daemon feeding the finality panel
+tracker/    finality_tracker.php — daemon feeding the legacy quorum panel
 contrib/systemd/  example unit for the tracker
 tests/      configuration & anti-secret checks
 maintenance/  static stand-by page for the public hostname (plain HTML, no PHP, no external resource)
@@ -73,7 +78,7 @@ password, no connection detail ever reaches the browser.
 # web UI: serve public/ (example with the PHP built-in server behind a proxy)
 php -S 127.0.0.1:3001 -t public/
 
-# finality tracker (or install the systemd unit from contrib/systemd/)
+# legacy quorum tracker (or install the systemd unit from contrib/systemd/)
 php tracker/finality_tracker.php
 ```
 
