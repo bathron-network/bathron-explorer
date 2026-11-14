@@ -1,3 +1,7 @@
+> **Historical repository — superseded by N; not maintained; see https://github.com/bathron-network/n-spec**
+
+# Historical README
+
 # BATHRON Explorer
 
 > **Network status:** <https://bathron.org/docs/status.html>. This explorer was built for the
