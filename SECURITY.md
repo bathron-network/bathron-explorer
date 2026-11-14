@@ -1,22 +1,7 @@
-# Security policy
+# Security Policy
 
-The BATHRON explorer is an **experimental** component built for the former DMM public
-testnet (network status: <https://bathron.org/docs/status.html>). It is
-designed to hold no secrets in code and to fail closed, but it has not been
-audited.
+This historical repository is no longer maintained. The legacy explorer receives no fixes, including security fixes. Security reports concerning the former DMM consensus are no longer accepted.
 
-## Reporting a vulnerability
+For security reports concerning N, follow the [n-spec security policy](https://github.com/bathron-network/n-spec/blob/main/SECURITY.md).
 
-Email **security@bathron.org**. Please do NOT open a public issue for
-security-sensitive reports.
-
-Include: affected file/endpoint, reproduction steps, impact assessment.
-You should receive an acknowledgement within a few days.
-
-## Scope notes
-
-- The explorer reads a local BATHRON node over loopback RPC with a dedicated
-  low-privilege credential; it must never be configured with a node's primary
-  RPC credentials.
-- The web server must serve only `public/`. `src/`, `tracker/`, state files
-  and the environment file live outside the webroot.
+This policy supersedes the security reporting instructions retained in the historical README.
